@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Punkte Schlacht - WW1 Panzer & Duales Waffensystem</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        canvas {
+            display: block;
+            background-color: #ffffff;
+        }
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 8px 16px 16px 16px;
+        }
+        .scoreboard {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(8px);
+            border-radius: 8px;
+            padding: 6px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .team-score {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        .team-score.red { color: #ef4444; }
+        .team-score.blue { color: #3b82f6; }
+        .badge {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: #fff;
+        }
+        .vs {
+            font-weight: 900;
+            color: #f59e0b;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+        }
+        .controls-hint {
+            align-self: center;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(8px);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .modal-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        .modal-screen.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .menu-title {
+            font-size: 3rem;
+            font-weight: 900;
+            letter-spacing: 3px;
+            color: #f59e0b;
+            margin-bottom: 8px;
+            text-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .menu-sub {
+            font-size: 1.1rem;
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+
+        .winner-banner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 24px 30px;
+            text-align: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            pointer-events: none;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            z-index: 10;
+            width: 90%;
+            max-width: 620px;
+        }
+        .winner-banner.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
+            pointer-events: auto;
+        }
+        .winner-title {
+            font-size: 2rem;
+            font-weight: 900;
+            margin-bottom: 4px;
+            letter-spacing: 2px;
+            color: #ef4444;
+        }
+        .map-selection {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 8px;
+        }
+        .map-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 130px;
+        }
+        .map-card:hover, .map-card.selected {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.2);
+        }
+        .map-card .preview {
+            width: 100%;
+            height: 45px;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .map-title {
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #f8fafc;
+        }
+        .unit-settings {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 12px 0;
+            text-align: left;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px;
+            border-radius: 8px;
+        }
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .slider-group label {
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            display: flex;
+            justify-content: space-between;
+        }
+        .slider-group input {
+            cursor: pointer;
+            width: 100%;
+        }
+        .btn-container {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        .btn {
+            background: #2563eb;
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #1d4ed8; }
+        .btn-secondary {
+            background: #475569;
+        }
+        .btn-secondary:hover { background: #334155; }
+        
+        .top-menu-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #f8fafc;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: bold;
+            z-index: 15;
+            transition: all 0.2s;
+        }
+        .top-menu-btn:hover {
+            background: #2563eb;
+            border-color: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas" width="1400" height="600"></canvas>
+    
+    <div class="overlay">
+        <div class="scoreboard">
+            <div class="team-score red">
+                <span>ROT</span>
+                <span class="badge" id="redWins">0 Siege</span>
+                <span class="badge" id="redActive">0/0</span>
+            </div>
+            <div class="vs" id="timer">01:00</div>
+            <div class="team-score blue">
+                <span class="badge" id="blueActive">0/0</span>
+                <span class="badge" id="blueWins">0 Siege</span>
+                <span>BLAU</span>
+            </div>
+        </div>
+
+        <div class="controls-hint" id="roundHint">
+            Runde 1 • Map: Matschfeld mit Schützengräben
+        </div>
+    </div>
+
+    <!-- Hauptmenü Screen -->
+    <div class="modal-screen active" id="mainMenuScreen">
+        <div class="menu-title">PUNKTE SCHLACHT</div>
+        <div class="menu-sub">WW1 Taktik & Simulation</div>
+        <button class="btn" style="font-size: 1.2rem; padding: 14px 36px;" onclick="startGameFromMenu()">Spiel Starten</button>
+    </div>
+
+    <!-- Rundeneinstellungen / Pause Banner -->
+    <div class="winner-banner" id="gameOverBanner">
+        <button class="top-menu-btn" onclick="returnToMainMenu()">Hauptmenü</button>
+
+        <div class="winner-title" id="bannerTitle">RUNDE BEENDET</div>
+        <div class="winner-sub">Konfiguriere die nächste Runde:</div>
+        
+        <div style="font-weight: bold; font-size: 0.8rem; color: #94a3b8; text-align: left;">1. MAP WÄHLEN:</div>
+        <div class="map-selection">
+            <div class="map-card" id="map-green" onclick="selectMapSelection('green')">
+                <div class="preview" style="background: #4ade80;"></div>
+                <div class="map-title">Grüne Wiese</div>
+            </div>
+            <div class="map-card selected" id="map-mud" onclick="selectMapSelection('mud')">
+                <div class="preview" style="background: #574331;"></div>
+                <div class="map-title">Matschfeld</div>
+            </div>
+        </div>
+
+        <div style="font-weight: bold; font-size: 0.8rem; color: #94a3b8; text-align: left; margin-top: 10px;">2. SPIEL- EINSTELLUNGEN:</div>
+        <div class="unit-settings">
+            <div class="slider-group" style="grid-column: span 2;">
+                <label><span>Rundenlänge:</span> <span id="val-time">60 Sek.</span></label>
+                <input type="range" id="slider-time" min="30" max="300" step="15" value="60" oninput="updateSliderVal('time')">
+            </div>
+            <div class="slider-group">
+                <label><span>Panzer:</span> <span id="val-tank">1</span></label>
+                <input type="range" id="slider-tank" min="0" max="5" value="1" oninput="updateSliderVal('tank')">
+            </div>
+            <div class="slider-group">
+                <label><span>MG-Schützen:</span> <span id="val-mg">3</span></label>
+                <input type="range" id="slider-mg" min="0" max="15" value="3" oninput="updateSliderVal('mg')">
+            </div>
+            <div class="slider-group">
+                <label><span>Sanitäter:</span> <span id="val-medic">3</span></label>
+                <input type="range" id="slider-medic" min="0" max="15" value="3" oninput="updateSliderVal('medic')">
+            </div>
+            <div class="slider-group">
+                <label><span>Sturmsoldaten:</span> <span id="val-assault">6</span></label>
+                <input type="range" id="slider-assault" min="0" max="20" value="6" oninput="updateSliderVal('assault')">
+            </div>
+            <div class="slider-group" style="grid-column: span 2;">
+                <label><span>Standard-Soldaten:</span> <span id="val-normal">17</span></label>
+                <input type="range" id="slider-normal" min="0" max="30" value="17" oninput="updateSliderVal('normal')">
+            </div>
+        </div>
+
+        <div class="btn-container">
+            <button class="btn" onclick="startNextRound()">Nächste Runde starten</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const CONFIG = {
+    speed: 0.3,
+    desiredDistance: 110,
+    maxSightRange: 280,
+    tankSightRange: 550,
+    maxGrenadeRange: 140,
+    respawnDelay: 10000,
+    bulletSpeed: 5.0,
+    treeCount: 6,
+    matchDuration: 60
+};
+
+const unitCounts = {
+    tank: 1,
+    mg: 3,
+    medic: 3,
+    assault: 6,
+    normal: 17
+};
+
+const stats = { redWins: 0, blueWins: 0, round: 1 };
+let isRoundEnding = false;
+let gamePaused = true;
+let selectedMap = 'mud';
+let currentMap = 'mud';
+
+let timeRemaining = CONFIG.matchDuration;
+let timerInterval = null;
+
+function updateSliderVal(type) {
+    if (type === 'time') {
+        const val = document.getElementById('slider-time').value;
+        document.getElementById('val-time').textContent = `${val} Sek.`;
+        CONFIG.matchDuration = parseInt(val);
+    } else {
+        const val = document.getElementById(`slider-${type}`).value;
+        document.getElementById(`val-${type}`).textContent = val;
+        unitCounts[type] = parseInt(val);
+    }
+}
+
+function selectMapSelection(mapType) {
+    selectedMap = mapType;
+    document.getElementById('map-green').classList.toggle('selected', mapType === 'green');
+    document.getElementById('map-mud').classList.toggle('selected', mapType === 'mud');
+}
+
+function startGameFromMenu() {
+    document.getElementById('mainMenuScreen').classList.remove('active');
+    stats.redWins = 0;
+    stats.blueWins = 0;
+    stats.round = 1;
+    startNextRound();
+}
+
+function returnToMainMenu() {
+    document.getElementById('gameOverBanner').classList.remove('show');
+    document.getElementById('mainMenuScreen').classList.add('active');
+    gamePaused = true;
+    clearInterval(timerInterval);
+}
+
+function startMatchTimer() {
+    clearInterval(timerInterval);
+    timeRemaining = CONFIG.matchDuration;
+    updateTimerDisplay();
+
+    timerInterval = setInterval(() => {
+        if (!isRoundEnding && !gamePaused) {
+            timeRemaining--;
+            updateTimerDisplay();
+
+            if (timeRemaining <= 0) {
+                clearInterval(timerInterval);
+                triggerGameOver();
+            }
+        }
+    }, 1000);
+}
+
+function updateTimerDisplay() {
+    const minutes = Math.floor(timeRemaining / 60);
+    const seconds = timeRemaining % 60;
+    document.getElementById('timer').textContent = 
+        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function triggerGameOver() {
+    gamePaused = true;
+    document.getElementById('gameOverBanner').classList.add('show');
+}
+
+function startNextRound() {
+    currentMap = selectedMap;
+    document.getElementById('gameOverBanner').classList.remove('show');
+    gamePaused = false;
+    
+    const mapNameDisplay = currentMap === 'green' ? 'Grüne Wiese' : 'Matschfeld (Gräben)';
+    document.getElementById('roundHint').textContent = `Runde ${stats.round} • Map: ${mapNameDisplay}`;
+    
+    initMapAndTeams();
+    startMatchTimer();
+}
+
+class Grass {
+    constructor(x, y) {
+        this.x = x; this.y = y;
+        this.size = 3 + Math.random() * 4;
+    }
+    draw() {
+        ctx.save();
+        ctx.strokeStyle = '#15803d';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x - 2, this.y - this.size);
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x + 2, this.y - this.size * 1.2);
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x + 4, this.y - this.size * 0.8);
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
+class Tree {
+    constructor(x, y, radius) {
+        this.x = x; this.y = y; this.radius = radius;
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.beginPath(); ctx.arc(6, 6, this.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#15803d';
+        ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath(); ctx.arc(-this.radius * 0.2, -this.radius * 0.2, this.radius * 0.6, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+    }
+}
+
+class Trench {
+    constructor(x, y, width, height) {
+        this.x = x; this.y = y; this.width = width; this.height = height;
+    }
+    contains(px, py) {
+        return px >= this.x && px <= this.x + this.width &&
+               py >= this.y && py <= this.y + this.height;
+    }
+    intersectsRect(rx, ry, rw, rh) {
+        return !(rx + rw < this.x || rx > this.x + this.width || ry + rh < this.y || ry > this.y + this.height);
+    }
+    draw() {
+        ctx.save();
+        ctx.fillStyle = '#2d1e18';
+        ctx.fillRect(this.x - 4, this.y - 4, this.width + 8, this.height + 8);
+        ctx.fillStyle = '#140c07';
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        
+        ctx.strokeStyle = '#3d2b1f';
+        ctx.lineWidth = 3;
+        for (let i = this.y + 15; i < this.y + this.height; i += 20) {
+            ctx.beginPath();
+            ctx.moveTo(this.x + 4, i);
+            ctx.lineTo(this.x + this.width - 4, i);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+}
+
+class TankTrackDecal {
+    constructor(x, y, angle) {
+        this.x = x; this.y = y; this.angle = angle;
+        this.alpha = 0.5;
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        ctx.fillStyle = `rgba(15, 10, 5, ${this.alpha})`;
+        ctx.fillRect(-6, -26, 12, 6);
+        ctx.fillRect(-6, 20, 12, 6);
+        ctx.restore();
+        this.alpha -= 0.0006;
+    }
+}
+
+class Bullet {
+    constructor(x, y, vx, vy, team, damage = 100, isExplosive = false, gunType = 'normal') {
+        this.x = x; this.y = y; this.vx = vx; this.vy = vy;
+        this.team = team; this.damage = damage; this.active = true;
+        this.isExplosive = isExplosive; this.gunType = gunType;
+        this.distanceTraveled = 0;
+        this.maxDistance = gunType === 'tank' ? CONFIG.tankSightRange + 60 : CONFIG.maxSightRange + 40;
+    }
+    update(trees, explosions) {
+        if (gamePaused) return;
+        this.x += this.vx; this.y += this.vy;
+        this.distanceTraveled += Math.hypot(this.vx, this.vy);
+
+        if (this.distanceTraveled >= this.maxDistance || this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) {
+            this.active = false; return;
+        }
+        for (let tree of trees) {
+            if (Math.hypot(this.x - tree.x, this.y - tree.y) < tree.radius) {
+                if (this.isExplosive) explosions.push(new Explosion(this.x, this.y, this.team, 55, 95));
+                this.active = false; break;
+            }
+        }
+    }
+    draw() {
+        ctx.fillStyle = this.isExplosive ? '#f97316' : (this.damage === 15 ? '#facc15' : (this.damage === 25 ? '#e11d48' : '#0f172a'));
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.isExplosive ? 6.5 : (this.damage < 100 ? 2.5 : 3.5), 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+class Grenade {
+    constructor(startX, startY, targetX, targetY, team) {
+        this.x = startX; this.y = startY;
+        this.startX = startX; this.startY = startY;
+        this.targetX = targetX; this.targetY = targetY;
+        this.team = team; this.progress = 0; this.active = true; this.speed = 0.04; 
+    }
+    update(explosions) {
+        if (gamePaused) return;
+        this.progress += this.speed;
+        this.x = this.startX + (this.targetX - this.startX) * this.progress;
+        this.y = this.startY + (this.targetY - this.startY) * this.progress;
+
+        if (this.progress >= 1) {
+            this.active = false;
+            explosions.push(new Explosion(this.targetX, this.targetY, this.team, 55, 85));
+        }
+    }
+    draw() {
+        const heightOffset = Math.sin(this.progress * Math.PI) * 35;
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath(); ctx.arc(this.x, this.y, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath(); ctx.arc(this.x, this.y - heightOffset, 5, 0, Math.PI * 2); ctx.fill();
+    }
+}
+
+class Explosion {
+    constructor(x, y, team, maxRadius = 55, damage = 85) {
+        this.x = x; this.y = y; this.team = team;
+        this.radius = 1; this.maxRadius = maxRadius;
+        this.damage = damage; this.active = true; this.hasDealtDamage = false;
+
+        this.particles = [];
+        for (let i = 0; i < 22; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2 + Math.random() * 4.5;
+            this.particles.push({
+                x: this.x, y: this.y,
+                vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                size: 2 + Math.random() * 4, life: 1
+            });
+        }
+    }
+    update(units) {
+        if (gamePaused) return;
+        this.radius += 3.5;
+
+        this.particles.forEach(p => {
+            p.x += p.vx; p.y += p.vy; p.life -= 0.04;
+        });
+
+        if (!this.hasDealtDamage) {
+            units.forEach(unit => {
+                if (unit.isAlive && unit.team !== this.team) {
+                    if (Math.hypot(unit.x - this.x, unit.y - this.y) <= this.maxRadius) {
+                        let finalDamage = this.damage;
+                        if (unit.inTrench) finalDamage = Math.min(40, this.damage);
+                        unit.takeDamage(finalDamage);
+                    }
+                }
+            });
+            this.hasDealtDamage = true;
+        }
+
+        if (this.radius >= this.maxRadius) this.active = false;
+    }
+    draw() {
+        ctx.save();
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(239, 68, 68, ${0.8 - this.radius / this.maxRadius})`; ctx.fill();
+
+        if (this.radius < this.maxRadius * 0.6) {
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * 0.6, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(254, 240, 138, ${1 - this.radius / (this.maxRadius * 0.6)})`; ctx.fill();
+        }
+
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * 1.1, 0, Math.PI * 2);
+        ctx.lineWidth = 3; ctx.strokeStyle = `rgba(245, 158, 11, ${1 - this.radius / this.maxRadius})`; ctx.stroke();
+
+        this.particles.forEach(p => {
+            if (p.life > 0) {
+                ctx.fillStyle = `rgba(251, 146, 60, ${p.life})`;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+            }
+        });
+        ctx.restore();
+    }
+}
+
+class Unit {
+    constructor(x, y, team, type = 'normal') {
+        this.x = x; this.y = y; this.vx = 0; this.vy = 0;
+        this.team = team; this.type = type;
+        
+        if (type === 'tank') {
+            this.hp = 1200; this.maxHp = 1200;
+            this.radius = 38;
+            this.gunLength = 48;
+            this.shootInterval = 3000;
+            this.mgInterval = 140;
+            this.lastMgShot = Date.now();
+            this.trackAnim = 0;
+            this.recoil = 0;
+            this.turretAngle = team === 'red' ? 0 : Math.PI;
+        } else {
+            this.hp = 100; this.maxHp = 100;
+            this.radius = type === 'mg' ? 15 : (type === 'medic' ? 12 : 13);
+            this.gunLength = type === 'mg' ? 22 : (type === 'assault' ? 18 : 15);
+            this.shootInterval = type === 'mg' ? 150 : (type === 'assault' ? 120 : 3000);
+        }
+
+        this.isAlive = true; this.angle = team === 'red' ? 0 : Math.PI;
+        this.inTrench = false;
+        this.lastShotTime = Date.now() + Math.random() * 2000;
+        this.lastGrenadeTime = Date.now() + Math.random() * 2000;
+        this.cycleStart = Date.now() + Math.random() * 3000;
+        this.strafeDirection = Math.random() < 0.5 ? 1 : -1;
+        this.lastStrafeChange = Date.now();
+        this.trenchPatience = 3000 + Math.random() * 4000;
+        this.trenchEnteredTime = 0;
+        this.respawnTimer = null;
+    }
+
+    findClosestEnemy(enemies, filterTank = false) {
+        let closest = null; let minDistance = Infinity;
+        for (let enemy of enemies) {
+            if (!enemy.isAlive) continue;
+            if (filterTank && enemy.type !== 'tank') continue;
+            const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+            if (dist < minDistance) { minDistance = dist; closest = enemy; }
+        }
+        return { enemy: closest, distance: minDistance };
+    }
+
+    findWoundedAlly(allies) {
+        let wounded = null; let minHp = Infinity;
+        for (let ally of allies) {
+            if (!ally.isAlive || ally === this || ally.type === 'tank') continue;
+            if (ally.hp < ally.maxHp && ally.hp < minHp) { minHp = ally.hp; wounded = ally; }
+        }
+        return wounded;
+    }
+
+    update(allies, enemies, bullets, grenades, trees, trenches, trackDecals) {
+        if (!this.isAlive || isRoundEnding || gamePaused) return;
+        let targetVx = 0; let targetVy = 0; const now = Date.now();
+
+        const wasInTrench = this.inTrench;
+        this.inTrench = this.type !== 'tank' && trenches.some(trench => trench.contains(this.x, this.y));
+        if (!wasInTrench && this.inTrench) {
+            this.trenchEnteredTime = now;
+        }
+
+        if (this.type === 'medic') {
+            const wounded = this.findWoundedAlly(allies);
+            if (wounded) {
+                const angle = Math.atan2(wounded.y - this.y, wounded.x - this.x);
+                this.angle = angle;
+                targetVx = Math.cos(angle) * CONFIG.speed * 1.25;
+                targetVy = Math.sin(angle) * CONFIG.speed * 1.25;
+                const dist = Math.hypot(wounded.x - this.x, wounded.y - this.y);
+                if (dist < this.radius + wounded.radius + 10) wounded.hp = Math.min(wounded.maxHp, wounded.hp + 0.4);
+            } else {
+                const { enemy, distance } = this.findClosestEnemy(enemies);
+                if (enemy && distance <= CONFIG.maxSightRange) {
+                    this.angle = Math.atan2(enemy.y - this.y, enemy.x - this.x);
+                }
+            }
+        } else if (this.type === 'tank') {
+            const pushDirection = this.team === 'red' ? 1 : -1;
+            const tankSpeed = CONFIG.speed * 0.35;
+
+            if (this.recoil > 0) this.recoil *= 0.85;
+
+            let tankTarget = this.findClosestEnemy(enemies, true).enemy;
+            if (!tankTarget) {
+                tankTarget = this.findClosestEnemy(enemies, false).enemy;
+            }
+
+            if (tankTarget) {
+                const targetAngle = Math.atan2(tankTarget.y - this.y, tankTarget.x - this.x);
+                
+                let angleDiff = targetAngle - this.turretAngle;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                this.turretAngle += angleDiff * 0.08;
+
+                const distToTarget = Math.hypot(tankTarget.x - this.x, tankTarget.y - this.y);
+                if (distToTarget > 220) {
+                    targetVx = Math.cos(targetAngle) * tankSpeed;
+                    targetVy = Math.sin(targetAngle) * tankSpeed;
+                }
+            } else {
+                targetVx = pushDirection * tankSpeed;
+                const moveAngle = pushDirection === 1 ? 0 : Math.PI;
+                this.turretAngle += (moveAngle - this.turretAngle) * 0.05;
+            }
+
+            if (Math.hypot(targetVx, targetVy) > 0.05) {
+                const moveAngle = Math.atan2(targetVy, targetVx);
+                let wanneDiff = moveAngle - this.angle;
+                while (wanneDiff < -Math.PI) wanneDiff += Math.PI * 2;
+                while (wanneDiff > Math.PI) wanneDiff -= Math.PI * 2;
+                this.angle += wanneDiff * 0.05;
+            }
+
+            if (tankTarget && Math.hypot(tankTarget.x - this.x, tankTarget.y - this.y) <= CONFIG.tankSightRange) {
+                if (now - this.lastShotTime >= this.shootInterval) {
+                    this.lastShotTime = now;
+                    this.recoil = 8;
+                    const gunTipX = this.x + Math.cos(this.turretAngle) * (this.gunLength - this.recoil);
+                    const gunTipY = this.y + Math.sin(this.turretAngle) * (this.gunLength - this.recoil);
+                    bullets.push(new Bullet(gunTipX, gunTipY, Math.cos(this.turretAngle) * (CONFIG.bulletSpeed * 1.2), Math.sin(this.turretAngle) * (CONFIG.bulletSpeed * 1.2), this.team, 180, true, 'tank'));
+                }
+            }
+
+            const infantryEnemies = enemies.filter(e => e.isAlive && e.type !== 'tank');
+            if (infantryEnemies.length > 0) {
+                let closestInf = null; let minInfDist = Infinity;
+                for (let inf of infantryEnemies) {
+                    const d = Math.hypot(inf.x - this.x, inf.y - this.y);
+                    if (d < minInfDist) { minInfDist = d; closestInf = inf; }
+                }
+
+                if (closestInf && minInfDist <= CONFIG.tankSightRange * 0.7) {
+                    if (now - this.lastMgShot >= this.mgInterval) {
+                        this.lastMgShot = now;
+                        const mgAngle = Math.atan2(closestInf.y - this.y, closestInf.x - this.x) + (Math.random() - 0.5) * 0.12;
+                        
+                        const sideOffset = Math.random() < 0.5 ? -18 : 18;
+                        const mgStartX = this.x + Math.cos(this.angle + Math.PI/2) * sideOffset;
+                        const mgStartY = this.y + Math.sin(this.angle + Math.PI/2) * sideOffset;
+
+                        bullets.push(new Bullet(mgStartX, mgStartY, Math.cos(mgAngle) * CONFIG.bulletSpeed, Math.sin(mgAngle) * CONFIG.bulletSpeed, this.team, 15, false, 'mg'));
+                    }
+                }
+            }
+
+            const movementMagnitude = Math.hypot(this.vx, this.vy);
+            if (movementMagnitude > 0.05) {
+                this.trackAnim += movementMagnitude * 0.35;
+                if (Math.random() < 0.3) {
+                    trackDecals.push(new TankTrackDecal(this.x, this.y, this.angle));
+                }
+            }
+
+        } else {
+            const { enemy, distance } = this.findClosestEnemy(enemies);
+            const canSeeEnemy = enemy && distance <= CONFIG.maxSightRange;
+            const pushDirection = this.team === 'red' ? 1 : -1;
+
+            if (this.inTrench) {
+                const timeInTrench = now - this.trenchEnteredTime;
+                
+                if (canSeeEnemy) {
+                    this.angle = Math.atan2(enemy.y - this.y, enemy.x - this.x);
+                } else {
+                    this.angle = pushDirection === 1 ? 0 : Math.PI;
+                }
+
+                if (timeInTrench > this.trenchPatience || (canSeeEnemy && distance < 150)) {
+                    targetVx = pushDirection * CONFIG.speed * 1.1;
+                    if (enemy) {
+                        targetVy = Math.sin(Math.atan2(enemy.y - this.y, enemy.x - this.x)) * CONFIG.speed * 0.8;
+                    }
+                } else {
+                    targetVx = pushDirection * CONFIG.speed * 0.3;
+                    if (now - this.lastStrafeChange > 1000) {
+                        this.strafeDirection *= -1;
+                        this.lastStrafeChange = now;
+                    }
+                    targetVy = this.strafeDirection * CONFIG.speed * 0.6;
+                }
+
+            } else if (enemy) {
+                const angleToEnemy = Math.atan2(enemy.y - this.y, enemy.x - this.x);
+                if (canSeeEnemy) this.angle = angleToEnemy;
+
+                if (now - this.lastStrafeChange > 1800 + Math.random() * 1200) {
+                    this.strafeDirection *= -1; this.lastStrafeChange = now;
+                }
+                const strafeAngle = angleToEnemy + (Math.PI / 2) * this.strafeDirection;
+                let desiredDist = CONFIG.desiredDistance; 
+                let moveSpeed = CONFIG.speed;
+                if (this.type === 'assault') { desiredDist = 70; moveSpeed *= 1.25; }
+
+                targetVx += Math.cos(strafeAngle) * moveSpeed * 0.5;
+                targetVy += Math.sin(strafeAngle) * moveSpeed * 0.5;
+
+                if (distance > desiredDist + 15) {
+                    targetVx += Math.cos(angleToEnemy) * moveSpeed * 0.9; 
+                    targetVy += Math.sin(angleToEnemy) * moveSpeed * 0.9;
+                } else if (distance < desiredDist - 15) {
+                    targetVx -= Math.cos(angleToEnemy) * moveSpeed * 0.8; 
+                    targetVy -= Math.sin(angleToEnemy) * moveSpeed * 0.8;
+                }
+            } else {
+                targetVx = pushDirection * CONFIG.speed * 0.8;
+                this.angle = pushDirection === 1 ? 0 : Math.PI;
+            }
+
+            if (canSeeEnemy) {
+                const angleToEnemy = Math.atan2(enemy.y - this.y, enemy.x - this.x);
+                let canShoot = true;
+                if (this.type === 'mg') canShoot = ((now - this.cycleStart) % 20000) < 10000;
+                else if (this.type === 'assault') canShoot = ((now - this.cycleStart) % 25000) < 15000;
+
+                if (canShoot && now - this.lastShotTime >= this.shootInterval) {
+                    this.lastShotTime = now;
+                    const spread = (Math.random() - 0.5) * (this.type === 'assault' ? 0.22 : 0.08);
+                    const shootAngle = angleToEnemy + spread;
+                    const gunTipX = this.x + Math.cos(shootAngle) * this.gunLength;
+                    const gunTipY = this.y + Math.sin(shootAngle) * this.gunLength;
+                    
+                    const damage = this.type === 'assault' ? 25 : (this.type === 'mg' ? 20 : 100);
+                    bullets.push(new Bullet(gunTipX, gunTipY, Math.cos(shootAngle) * CONFIG.bulletSpeed, Math.sin(shootAngle) * CONFIG.bulletSpeed, this.team, damage, false, this.type === 'normal' ? 'rifle' : this.type));
+                }
+            }
+
+            if (this.type === 'assault' && now - this.lastGrenadeTime >= 5000) {
+                if (enemy && distance <= CONFIG.maxGrenadeRange) {
+                    this.lastGrenadeTime = now;
+                    grenades.push(new Grenade(this.x, this.y, enemy.x, enemy.y, this.team));
+                }
+            }
+        }
+
+        for (let ally of allies) {
+            if (ally === this || !ally.isAlive) continue;
+            const minDist = (this.radius + ally.radius) * 1.1;
+            if (Math.hypot(ally.x - this.x, ally.y - this.y) < minDist) {
+                const pushAngle = Math.atan2(this.y - ally.y, this.x - ally.x);
+                targetVx += Math.cos(pushAngle) * 0.8; targetVy += Math.sin(pushAngle) * 0.8;
+            }
+        }
+        for (let tree of trees) {
+            if (Math.hypot(tree.x - this.x, tree.y - this.y) < tree.radius + this.radius + 5) {
+                const pushAngle = Math.atan2(this.y - tree.y, this.x - tree.x);
+                targetVx += Math.cos(pushAngle) * 1.5; targetVy += Math.sin(pushAngle) * 1.5;
+            }
+        }
+
+        this.vx = this.vx * 0.82 + targetVx * 0.18;
+        this.vy = this.vy * 0.82 + targetVy * 0.18;
+        this.x += this.vx; this.y += this.vy;
+
+        const margin = this.radius + 10;
+        this.x = Math.max(margin, Math.min(canvas.width - margin, this.x));
+        this.y = Math.max(margin, Math.min(canvas.height - margin, this.y));
+    }
+
+    takeDamage(amount) {
+        this.hp -= amount;
+        if (this.hp <= 0) this.die();
+    }
+    die() {
+        this.isAlive = false; this.vx = 0; this.vy = 0;
+        this.respawnTimer = setTimeout(() => {
+            if (!isRoundEnding && !gamePaused) this.respawn();
+        }, CONFIG.respawnDelay);
+    }
+    respawn() {
+        this.x = this.team === 'red' ? 40 + Math.random() * 100 : canvas.width - 40 - Math.random() * 100;
+        this.y = 50 + Math.random() * (canvas.height - 100);
+        this.hp = this.maxHp; this.isAlive = true;
+        this.lastShotTime = Date.now(); this.cycleStart = Date.now();
+    }
+
+    draw() {
+        ctx.save(); ctx.translate(this.x, this.y);
+        if (!this.isAlive) {
+            ctx.fillStyle = '#94a3b8'; ctx.beginPath(); ctx.arc(0, 0, this.radius * 0.8, 0, Math.PI * 2); ctx.fill();
+            ctx.restore(); return;
+        }
+
+        let mainColor = this.team === 'red' ? '#ef4444' : '#3b82f6';
+        let darkColor = this.team === 'red' ? '#991b1b' : '#1d4ed8';
+
+        if (this.type === 'tank') {
+            ctx.save();
+            ctx.rotate(this.angle);
+
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(-42, -28, 84, 12);
+            ctx.fillRect(-42, 16, 84, 12);
+
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 2;
+            const offset = (this.trackAnim % 8);
+            for (let i = -38 + offset; i <= 38; i += 8) {
+                if (i >= -40 && i <= 40) {
+                    ctx.beginPath(); ctx.moveTo(i, -28); ctx.lineTo(i, -16); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(i, 16); ctx.lineTo(i, 28); ctx.stroke();
+                }
+            }
+
+            ctx.fillStyle = darkColor;
+            ctx.beginPath();
+            ctx.moveTo(-40, -20);
+            ctx.lineTo(25, -20);
+            ctx.lineTo(42, 0);
+            ctx.lineTo(25, 20);
+            ctx.lineTo(-40, 20);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = mainColor;
+            ctx.fillRect(-32, -15, 60, 30);
+
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(-10, -32, 22, 6);
+            ctx.fillRect(-10, 26, 22, 6);
+            
+            ctx.restore();
+
+            ctx.save();
+            ctx.rotate(this.turretAngle);
+
+            const effectiveGunLength = this.gunLength - this.recoil;
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(5, -5, effectiveGunLength, 10);
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(10, -7, 16, 14);
+
+            ctx.fillStyle = darkColor;
+            ctx.beginPath();
+            ctx.arc(0, 0, 18, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.restore();
+
+        } else {
+            ctx.rotate(this.angle);
+            ctx.fillStyle = '#1e293b';
+            if (this.type === 'mg') ctx.fillRect(2, -4, this.gunLength, 8);
+            else if (this.type === 'assault') { ctx.fillRect(2, -3, this.gunLength, 6); ctx.fillStyle = '#e11d48'; ctx.fillRect(6, -2, 4, 4); }
+            else if (this.type === 'normal') ctx.fillRect(2, -3, this.gunLength, 6);
+
+            const currentRadius = this.inTrench ? this.radius * 0.85 : this.radius;
+
+            ctx.beginPath(); ctx.arc(0, 0, currentRadius, 0, Math.PI * 2);
+            ctx.fillStyle = mainColor; ctx.fill();
+            ctx.lineWidth = 2.5; ctx.strokeStyle = darkColor; ctx.stroke();
+
+            if (this.type === 'medic') {
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(-4, -1.5, 8, 3); ctx.fillRect(-1.5, -4, 3, 8);
+            } else {
+                ctx.fillStyle = '#ffffff'; ctx.beginPath();
+                ctx.arc(currentRadius * 0.4, -3, 3, 0, Math.PI * 2);
+                ctx.arc(currentRadius * 0.4, 3, 3, 0, Math.PI * 2); ctx.fill();
+            }
+
+            if (this.inTrench) {
+                ctx.rotate(-this.angle);
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath();
+                ctx.arc(0, -this.radius - 6, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        ctx.restore();
+
+        if (this.hp < this.maxHp) {
+            const barWidth = this.type === 'tank' ? 65 : 30;
+            ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(this.x - barWidth / 2, this.y - this.radius - 16, barWidth, 5);
+            ctx.fillStyle = '#22c55e'; ctx.fillRect(this.x - barWidth / 2, this.y - this.radius - 16, (this.hp / this.maxHp) * barWidth, 5);
+        }
+    }
+}
+
+let redTeam = [], blueTeam = [], bullets = [], grenades = [], explosions = [], trees = [], grassBlades = [];
+let mudPuddles = [], mudTracks = [], trenches = [], trackDecals = [];
+
+function generateTeamRoles() {
+    const roles = [];
+    for (let type in unitCounts) {
+        for (let i = 0; i < unitCounts[type]; i++) {
+            roles.push(type);
+        }
+    }
+    return roles;
+}
+
+function initMapAndTeams() {
+    redTeam = []; blueTeam = []; bullets = []; grenades = []; explosions = []; trees = []; grassBlades = [];
+    mudPuddles = []; mudTracks = []; trenches = []; trackDecals = [];
+
+    const classRoles = generateTeamRoles();
+    const teamSize = classRoles.length;
+
+    if (currentMap === 'green') {
+        canvas.style.backgroundColor = '#4ade80';
+
+        for (let i = 0; i < 150; i++) {
+            grassBlades.push(new Grass(Math.random() * canvas.width, Math.random() * canvas.height));
+        }
+
+        for (let i = 0; i < CONFIG.treeCount; i++) {
+            let attempts = 0, valid = false, x, y, r;
+            while (!valid && attempts < 100) {
+                attempts++;
+                x = 180 + Math.random() * (canvas.width - 360);
+                y = 50 + Math.random() * (canvas.height - 100);
+                r = 20 + Math.random() * 20;
+                valid = !trees.some(t => Math.hypot(t.x - x, t.y - y) < t.radius + r + 20);
+            }
+            if (valid) trees.push(new Tree(x, y, r));
+        }
+
+        for (let i = 0; i < teamSize; i++) {
+            const spacing = (canvas.height - 60) / Math.max(1, teamSize);
+            const role = classRoles[i];
+            redTeam.push(new Unit(40 + (i % 3) * 25, 30 + i * spacing, 'red', role));
+            blueTeam.push(new Unit(canvas.width - 40 - (i % 3) * 25, 30 + i * spacing, 'blue', role));
+        }
+
+    } else if (currentMap === 'mud') {
+        canvas.style.backgroundColor = '#453324';
+
+        trenches.push(new Trench(200, 80, 60, 440));   
+        trenches.push(new Trench(1140, 80, 60, 440));  
+        trenches.push(new Trench(620, 150, 160, 60));  
+        trenches.push(new Trench(620, 390, 160, 60));  
+
+        for (let i = 0; i < 30; i++) {
+            mudTracks.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                rx: 40 + Math.random() * 90,
+                ry: 20 + Math.random() * 50,
+                angle: Math.random() * Math.PI
+            });
+        }
+
+        let puddleAttempts = 0;
+        while (mudPuddles.length < 12 && puddleAttempts < 200) {
+            puddleAttempts++;
+            const px = 100 + Math.random() * (canvas.width - 200);
+            const py = 50 + Math.random() * (canvas.height - 100);
+            const prx = 30 + Math.random() * 50;
+            const pry = 15 + Math.random() * 30;
+
+            const overlapsTrench = trenches.some(trench => trench.intersectsRect(px - prx, py - pry, prx * 2, pry * 2));
+            if (!overlapsTrench) {
+                mudPuddles.push({
+                    x: px, y: py, rx: prx, ry: pry, angle: Math.random() * Math.PI
+                });
+            }
+        }
+
+        for (let i = 0; i < 4; i++) {
+            trees.push(new Tree(320 + Math.random() * (canvas.width - 640), 80 + Math.random() * (canvas.height - 160), 22));
+        }
+
+        for (let i = 0; i < teamSize; i++) {
+            const spacing = (canvas.height - 60) / Math.max(1, teamSize);
+            const role = classRoles[i];
+            redTeam.push(new Unit(40 + (i % 3) * 25, 30 + i * spacing, 'red', role));
+            blueTeam.push(new Unit(canvas.width - 40 - (i % 3) * 25, 30 + i * spacing, 'blue', role));
+        }
+    }
+}
+
+function checkCollisions() {
+    for (let bullet of bullets) {
+        if (!bullet.active) continue;
+
+        const targets = bullet.team === 'red' ? blueTeam : redTeam;
+        for (let target of targets) {
+            if (target.isAlive && Math.hypot(bullet.x - target.x, bullet.y - target.y) < target.radius) {
+                let finalDamage = bullet.damage;
+                if (target.inTrench) {
+                    if (bullet.gunType === 'rifle') {
+                        finalDamage = 50;
+                    } else {
+                        finalDamage = bullet.damage * 0.5;
+                    }
+                }
+
+                target.takeDamage(finalDamage);
+                if (bullet.isExplosive) explosions.push(new Explosion(bullet.x, bullet.y, bullet.team, 55, 95));
+                bullet.active = false; break;
+            }
+        }
+    }
+}
+
+function checkRoundEnd() {
+    if (isRoundEnding || gamePaused) return;
+    const redAlive = redTeam.filter(u => u.isAlive).length;
+    const blueAlive = blueTeam.filter(u => u.isAlive).length;
+
+    if (redTeam.length > 0 || blueTeam.length > 0) {
+        if (redAlive === 0 && blueAlive > 0) triggerRoundEnd('BLAU');
+        else if (blueAlive === 0 && redAlive > 0) triggerRoundEnd('ROT');
+    }
+}
+
+function triggerRoundEnd(winner) {
+    isRoundEnding = true;
+    [...redTeam, ...blueTeam].forEach(u => clearTimeout(u.respawnTimer));
+    if (winner === 'ROT') stats.redWins++; else stats.blueWins++;
+
+    setTimeout(() => {
+        if (!gamePaused) {
+            initMapAndTeams();
+            isRoundEnding = false;
+        }
+    }, 2000);
+}
+
+function updateUI() {
+    document.getElementById('redActive').textContent = `${redTeam.filter(u => u.isAlive).length}/${redTeam.length} Aktiv`;
+    document.getElementById('blueActive').textContent = `${blueTeam.filter(u => u.isAlive).length}/${blueTeam.length} Aktiv`;
+    document.getElementById('redWins').textContent = `${stats.redWins} Siege`;
+    document.getElementById('blueWins').textContent = `${stats.blueWins} Siege`;
+}
+
+function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 1. Spielfeld-Raster ganz am Anfang auf den Hintergrund zeichnen
+    ctx.strokeStyle = currentMap === 'mud' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.15)'; 
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
+    for (let y = 0; y < canvas.height; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
+
+    // 2. Bodentexturen (Gras, Schlamm, Gräben, Pfützen)
+    if (currentMap === 'mud') {
+        ctx.save();
+        mudTracks.forEach(m => {
+            ctx.fillStyle = '#2f2115';
+            ctx.beginPath();
+            ctx.ellipse(m.x, m.y, m.rx, m.ry, m.angle, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        trenches.forEach(trench => trench.draw());
+
+        mudPuddles.forEach(p => {
+            ctx.fillStyle = '#3a505f';
+            ctx.beginPath();
+            ctx.ellipse(p.x, p.y, p.rx, p.ry, p.angle, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#273742';
+            ctx.stroke();
+        });
+        ctx.restore();
+    } else {
+        grassBlades.forEach(g => g.draw());
+    }
+
+    // 3. Spuren & Decals
+    trackDecals.forEach(d => d.draw());
+    trackDecals = trackDecals.filter(d => d.alpha > 0);
+
+    const allUnits = [...redTeam, ...blueTeam];
+
+    // Logik-Updates
+    if (!gamePaused) {
+        redTeam.forEach(u => u.update(redTeam, blueTeam, bullets, grenades, trees, trenches, trackDecals));
+        blueTeam.forEach(u => u.update(blueTeam, redTeam, bullets, grenades, trees, trenches, trackDecals));
+
+        bullets.forEach(b => b.update(trees, explosions));
+        grenades.forEach(g => g.update(explosions));
+        explosions.forEach(e => e.update(allUnits));
+
+        if (!isRoundEnding) {
+            checkCollisions();
+            checkRoundEnd();
+        }
+
+        bullets = bullets.filter(b => b.active);
+        grenades = grenades.filter(g => g.active);
+        explosions = explosions.filter(e => e.active);
+    }
+
+    // 4. Einheiten, Schüsse und Explosionen
+    redTeam.forEach(u => u.draw());
+    blueTeam.forEach(u => u.draw());
+    bullets.forEach(b => b.draw());
+    grenades.forEach(g => g.draw());
+    explosions.forEach(e => e.draw());
+
+    // 5. Bäume ZULETZT zeichnen (Kronen liegen über dem Boden)
+    trees.forEach(t => t.draw());
+
+    updateUI();
+    requestAnimationFrame(gameLoop);
+}
+
+initMapAndTeams();
+gameLoop();
+</script>
+
+</body>
+</html>
